@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluidaLab 3D: Permukaan Cairan dan Kapilaritas</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D Rendering & WebXR AR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Chart.js for Capillarity Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- MathJax for rendering equations -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#0B132B',
+                            navy: '#1C2541',
+                            blue: '#3A506B',
+                            cyan: '#00B4D8',
+                            sky: '#90E0EF',
+                            accent: '#FF70A6',
+                            orange: '#FF9F1C',
+                            emerald: '#10B981'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0F172A; color: #F8FAFC; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(0, 180, 216, 0.5);
+            transform: translateY(-2px);
+        }
+        .glow-cyan { box-shadow: 0 0 20px rgba(0, 180, 216, 0.35); }
+        .glow-orange { box-shadow: 0 0 20px rgba(255, 159, 28, 0.35); }
+        canvas { outline: none; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0F172A; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00B4D8; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('beranda')">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-lg glow-cyan">
+                        <i class="fa-solid fa-droplet font-bold"></i>
+                    </div>
+                    <div>
+                        <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-200 to-white">FluidaLab 3D</span>
+                        <span class="block text-[10px] text-cyan-400 font-mono tracking-widest uppercase">Permukaan Cairan & Kapilaritas</span>
+                    </div>
+                </div>
+
+                <!-- Desktop Navigation -->
+                <nav class="hidden md:flex items-center space-x-1">
+                    <button onclick="switchTab('beranda')" id="nav-beranda" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-cyan-400 bg-slate-800/80"><i class="fa-solid fa-house mr-1.5"></i> Beranda</button>
+                    <button onclick="switchTab('materi')" id="nav-materi" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/50"><i class="fa-solid fa-book-open mr-1.5"></i> Materi</button>
+                    <button onclick="switchTab('simulasi')" id="nav-simulasi" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/50"><i class="fa-solid fa-flask mr-1.5"></i> Simulasi 3D/AR</button>
+                    <button onclick="switchTab('penerapan')" id="nav-penerapan" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/50"><i class="fa-solid fa-seedling mr-1.5"></i> Penerapan</button>
+                    <button onclick="switchTab('lkpd')" id="nav-lkpd" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/50"><i class="fa-solid fa-file-pen mr-1.5"></i> LKPD</button>
+                    <button onclick="switchTab('latihan')" id="nav-latihan" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/50"><i class="fa-solid fa-graduation-cap mr-1.5"></i> Kuis</button>
+                </nav>
+
+                <!-- Mobile Menu Button -->
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" onclick="toggleMobileMenu()" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-slate-800 bg-slate-900/95 backdrop-blur-lg px-4 pt-2 pb-4 space-y-1">
+            <button onclick="switchTab('beranda'); toggleMobileMenu()" class="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:bg-slate-800"><i class="fa-solid fa-house w-6"></i> Beranda</button>
+            <button onclick="switchTab('materi'); toggleMobileMenu()" class="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:bg-slate-800"><i class="fa-solid fa-book-open w-6"></i> Materi</button>
+            <button onclick="switchTab('simulasi'); toggleMobileMenu()" class="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:bg-slate-800"><i class="fa-solid fa-flask w-6"></i> Simulasi 3D/AR</button>
+            <button onclick="switchTab('penerapan'); toggleMobileMenu()" class="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:bg-slate-800"><i class="fa-solid fa-seedling w-6"></i> Penerapan</button>
+            <button onclick="switchTab('lkpd'); toggleMobileMenu()" class="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:bg-slate-800"><i class="fa-solid fa-file-pen w-6"></i> LKPD</button>
+            <button onclick="switchTab('latihan'); toggleMobileMenu()" class="w-full text-left px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:bg-slate-800"><i class="fa-solid fa-graduation-cap w-6"></i> Kuis Evaluasi</button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+
+        <!-- ================= SECTION: BERANDA ================= -->
+        <section id="tab-beranda" class="tab-content space-y-12 py-6">
+            <!-- Hero Banner -->
+            <div class="relative rounded-3xl overflow-hidden glass-panel p-8 sm:p-12 border border-slate-700/50 bg-gradient-to-br from-slate-900 via-slate-900/90 to-blue-950/40">
+                <div class="absolute -right-20 -top-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute right-1/3 -bottom-20 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="relative z-10 max-w-3xl space-y-6">
+                    <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-semibold">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <span>Eksplorasi Interaksi Permukaan Cairan & WebAR Interaktif</span>
+                    </div>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-none text-white">
+                        Eksplorasi <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-300 to-orange-400">Tegangan Permukaan</span> & Kapilaritas
+                    </h1>
+                    <p class="text-slate-300 text-lg leading-relaxed">
+                        Pelajari bagaimana tegangan permukaan dan gaya adhesi-kohesi mempengaruhi bentuk tetesan air, kenaikan cairan pada pembuluh kapiler, hingga mekanisme transportasi air pada tumbuhan dan bahan berpori.
+                    </p>
+                    <div class="flex flex-wrap gap-4 pt-2">
+                        <button onclick="switchTab('simulasi')" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-base shadow-lg hover:shadow-cyan-500/25 transition-all transform hover:-translate-y-0.5 flex items-center space-x-2">
+                            <i class="fa-solid fa-cubes text-lg"></i>
+                            <span>Eksperimen Simulasi 3D</span>
+                        </button>
+                        <button onclick="switchTab('materi')" class="px-6 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-base transition-all flex items-center space-x-2">
+                            <i class="fa-solid fa-book-open text-lg"></i>
+                            <span>Materi Pembelajaran</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experiment Modules Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Modul 1 -->
+                <div class="glass-panel p-6 rounded-3xl border border-cyan-500/30 flex flex-col justify-between space-y-4 relative overflow-hidden">
+                    <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-mono text-cyan-400 font-bold uppercase">Simulasi 1</span>
+                        <h3 class="text-xl font-bold text-white mt-1">Tegangan Permukaan</h3>
+                        <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                            Ukur gaya tarik ($F$) pada kawat geser, variasi tegangan ($\gamma$), suhu, dan konsentrasi deterjen (surfaktan).
+                        </p>
+                    </div>
+                    <button onclick="openSimulation('surface')" class="w-full py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <span>Buka Simulasi</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Modul 2 -->
+                <div class="glass-panel p-6 rounded-3xl border border-sky-500/30 flex flex-col justify-between space-y-4 relative overflow-hidden">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-ruler-vertical"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-mono text-sky-400 font-bold uppercase">Simulasi 2</span>
+                        <h3 class="text-xl font-bold text-white mt-1">Gejala Kapilaritas</h3>
+                        <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                            Amati kenaikan ($h$) atau penurunan cairan pada pipa kapiler berdiameter $r$, sudut kontak ($\theta$), dan massa jenis ($\rho$).
+                        </p>
+                    </div>
+                    <button onclick="openSimulation('capillarity')" class="w-full py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <span>Buka Simulasi</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Modul 3 -->
+                <div class="glass-panel p-6 rounded-3xl border border-emerald-500/30 flex flex-col justify-between space-y-4 relative overflow-hidden">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-seedling"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-mono text-emerald-400 font-bold uppercase">Simulasi 3</span>
+                        <h3 class="text-xl font-bold text-white mt-1">Penerapan Biologis & Alat</h3>
+                        <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                            Simulasikan penyerapan air pada pembuluh xilem tanaman, serat jaringan tisu, dan sumbu minyak.
+                        </p>
+                    </div>
+                    <button onclick="switchTab('penerapan')" class="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <span>Lihat Penerapan</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Modul 4 -->
+                <div class="glass-panel p-6 rounded-3xl border border-orange-500/30 flex flex-col justify-between space-y-4 relative overflow-hidden">
+                    <div class="w-12 h-12 rounded-2xl bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-vial-circle-check"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-mono text-orange-400 font-bold uppercase">Simulasi 4</span>
+                        <h3 class="text-xl font-bold text-white mt-1">Tantangan Kontekstual</h3>
+                        <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                            Selesaikan kasus integrasi: Hidrostatis + Pascal + Archimedes + Tegangan Permukaan & Kapilaritas.
+                        </p>
+                    </div>
+                    <button onclick="switchTab('penerapan')" class="w-full py-2.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <span>Uji Tantangan</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= SECTION: MATERI ================= -->
+        <section id="tab-materi" class="tab-content hidden space-y-8 py-6">
+            <div class="text-center max-w-2xl mx-auto">
+                <h1 class="text-3xl font-extrabold text-white">Materi Pembelajaran</h1>
+                <p class="text-slate-400 text-sm mt-1">6 Subbab Konsep Tegangan Permukaan & Kapilaritas</p>
+            </div>
+
+            <!-- Subbab Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Subbab 1 -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 cursor-pointer hover:border-cyan-400/50" onclick="openMateriModal(1)">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono font-bold text-cyan-400 bg-cyan-950 px-2.5 py-1 rounded-md border border-cyan-800">Subbab 01</span>
+                            <i class="fa-solid fa-arrows-left-right-to-line text-slate-400"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Pengertian Tegangan Permukaan</h3>
+                        <p class="text-xs text-slate-400 line-clamp-3">
+                            Kecenderungan permukaan zat cair untuk menegang seperti selaput elastis akibat kohesi antarmolekul.
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-cyan-400">
+                        <span>Baca Selengkapnya</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <!-- Subbab 2 -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 cursor-pointer hover:border-cyan-400/50" onclick="openMateriModal(2)">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono font-bold text-cyan-400 bg-cyan-950 px-2.5 py-1 rounded-md border border-cyan-800">Subbab 02</span>
+                            <i class="fa-solid fa-temperature-arrow-up text-slate-400"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Faktor Tegangan Permukaan</h3>
+                        <p class="text-xs text-slate-400 line-clamp-3">
+                            Pengaruh suhu, jenis zat cair, dan zat aktif permukaan (surfaktan/deterjen) terhadap $\gamma$.
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-cyan-400">
+                        <span>Baca Selengkapnya</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <!-- Subbab 3 -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 cursor-pointer hover:border-sky-400/50" onclick="openMateriModal(3)">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono font-bold text-sky-400 bg-sky-950 px-2.5 py-1 rounded-md border border-sky-800">Subbab 03</span>
+                            <i class="fa-solid fa-ruler-vertical text-slate-400"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Prinsip Kapilaritas</h3>
+                        <p class="text-xs text-slate-400 line-clamp-3">
+                            Peristiwa naik turunnya zat cair dalam pipa sempit akibat kompetisi gaya Adhesi dan Kohesi ($\theta$).
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-sky-400">
+                        <span>Baca Selengkapnya</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <!-- Subbab 4 -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 cursor-pointer hover:border-emerald-400/50" onclick="openMateriModal(4)">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono font-bold text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-md border border-emerald-800">Subbab 04</span>
+                            <i class="fa-solid fa-seedling text-slate-400"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Penerapan Kapilaritas Sehari-hari</h3>
+                        <p class="text-xs text-slate-400 line-clamp-3">
+                            Transportasi air pada xilem tumbuhan, penyerap cairan tisu dapur, dan sumbu kompor minyak.
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-emerald-400">
+                        <span>Baca Selengkapnya</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <!-- Subbab 5 -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 cursor-pointer hover:border-orange-400/50" onclick="openMateriModal(5)">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono font-bold text-orange-400 bg-orange-950 px-2.5 py-1 rounded-md border border-orange-800">Subbab 05</span>
+                            <i class="fa-solid fa-puzzle-piece text-slate-400"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Masalah Kontekstual Fluida</h3>
+                        <p class="text-xs text-slate-400 line-clamp-3">
+                            Menghubungkan Tegangan Permukaan, Kapilaritas, Tekanan Hidrostatis, Pascal, dan Archimedes.
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-orange-400">
+                        <span>Baca Selengkapnya</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <!-- Subbab 6 -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 cursor-pointer hover:border-purple-400/50" onclick="openMateriModal(6)">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono font-bold text-purple-400 bg-purple-950 px-2.5 py-1 rounded-md border border-purple-800">Subbab 06</span>
+                            <i class="fa-solid fa-list-check text-slate-400"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Evaluasi Konsep & Rumus</h3>
+                        <p class="text-xs text-slate-400 line-clamp-3">
+                            Langkah sistematis penyelesaian contoh soal hitungan tegangan permukaan dan pipa kapiler.
+                        </p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-purple-400">
+                        <span>Baca Selengkapnya</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- MATERI MODAL POPUP -->
+        <div id="materi-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div class="glass-panel w-full max-w-3xl max-h-[85vh] rounded-3xl overflow-hidden flex flex-col border border-slate-700 shadow-2xl animate-fade-in">
+                <!-- Modal Header -->
+                <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                    <div id="materi-modal-title-container">
+                        <!-- Dynamic Title -->
+                    </div>
+                    <button onclick="closeMateriModal()" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <!-- Modal Content -->
+                <div id="materi-modal-body" class="p-6 overflow-y-auto space-y-6 text-slate-300 text-sm leading-relaxed">
+                    <!-- Dynamic Body -->
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION: SIMULASI 3D & WebAR ================= -->
+        <section id="tab-simulasi" class="tab-content hidden space-y-6 py-4">
+            
+            <!-- Sub Navigation Tabs for Simulation -->
+            <div class="flex items-center justify-center space-x-3 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 max-w-md mx-auto">
+                <button id="sim-btn-surface" onclick="switchSim('surface')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-cyan-500 text-white shadow-md">
+                    <i class="fa-solid fa-arrows-left-right-to-line mr-1.5"></i> Tegangan Permukaan
+                </button>
+                <button id="sim-btn-capillarity" onclick="switchSim('capillarity')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-ruler-vertical mr-1.5"></i> Kapilaritas
+                </button>
+            </div>
+
+            <!-- SIMULASI 1: TEGANGAN PERMUKAAN -->
+            <div id="sim-container-surface" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 3D Viewport Column -->
+                <div class="lg:col-span-2 glass-panel rounded-3xl p-4 border border-slate-800 flex flex-col h-[540px] relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-2 px-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+                            <h3 class="text-sm font-bold text-white font-mono">3D Surface Tension Viewport</h3>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="resetSurfaceSim()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Reset View
+                            </button>
+                            <button onclick="triggerAR('surface')" class="px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-xs text-white font-bold shadow-md hover:brightness-110">
+                                <i class="fa-solid fa-vr-cardboard mr-1"></i> Lihat dalam AR
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Three.js Canvas Container -->
+                    <div id="canvas-surface" class="flex-grow w-full h-full rounded-2xl bg-slate-950/80 relative cursor-grab active:cursor-grabbing overflow-hidden">
+                        <!-- Canvas Overlay Text -->
+                        <div class="absolute bottom-3 left-3 pointer-events-none text-[11px] font-mono text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-md border border-slate-800">
+                            <i class="fa-solid fa-hand-pointer mr-1"></i> Drag / Putar Model 3D | Scroll Zoom
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Control Panel -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-6">
+                    <div class="space-y-4">
+                        <h3 class="text-base font-bold text-white pb-2 border-b border-slate-800 flex items-center justify-between">
+                            <span><i class="fa-solid fa-sliders text-cyan-400 mr-2"></i> Kontrol Tegangan</span>
+                            <span class="text-xs font-mono text-cyan-400">SI Units</span>
+                        </h3>
+
+                        <!-- Mode Surface -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Mode Permukaan</label>
+                            <select id="select-surface-mode" onchange="updateSurfaceSim()" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-cyan-400 outline-none">
+                                <option value="single">Satu Batas Permukaan Cairan (F = γ · L)</option>
+                                <option value="double">Film Sabun / Dua Permukaan (F = 2 · γ · L)</option>
+                            </select>
+                        </div>
+
+                        <!-- Tegangan Permukaan (Gamma) -->
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-300">Tegangan Permukaan ($\gamma$)</span>
+                                <span id="val-gamma" class="font-mono text-cyan-400 font-bold">0.072 N/m</span>
+                            </div>
+                            <input type="range" id="input-gamma" min="0.020" max="0.100" step="0.001" value="0.072" oninput="updateSurfaceSim()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                            <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                                <span>0.020 (Deterjen)</span>
+                                <span>0.072 (Air)</span>
+                                <span>0.100</span>
+                            </div>
+                        </div>
+
+                        <!-- Panjang Kawat (L) -->
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-300">Panjang Kawat ($L$)</span>
+                                <span id="val-wire-l" class="font-mono text-cyan-400 font-bold">0.05 m (5 cm)</span>
+                            </div>
+                            <input type="range" id="input-wire-l" min="0.01" max="0.15" step="0.01" value="0.05" oninput="updateSurfaceSim()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                        </div>
+
+                        <!-- Suhu & Surfaktan Model -->
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Suhu ($^\circ\text{C}$)</label>
+                                <input type="number" id="input-temp" min="0" max="100" value="20" onchange="adjustSurfaceByTemp()" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Surfaktan (%)</label>
+                                <input type="number" id="input-surf" min="0" max="100" value="0" onchange="adjustSurfaceBySurf()" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2 font-mono">
+                            </div>
+                        </div>
+
+                        <!-- Computed Force Display -->
+                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2 font-mono text-xs">
+                            <div class="flex justify-between items-center text-slate-300">
+                                <span>Gaya Tarik Permukaan ($F$):</span>
+                                <span id="res-surface-f" class="text-cyan-300 font-bold text-sm">0.0036 N</span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-300">
+                                <span>Sama Dengan:</span>
+                                <span id="res-surface-mn" class="text-emerald-400 font-bold">3.6 mN</span>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 italic">
+                                <i class="fa-solid fa-circle-info mr-1 text-cyan-400"></i>
+                                <span id="res-surface-formula">F = γ · L = 0.072 · 0.05 = 0.0036 N</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="pullWireAnim()" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-up-long"></i>
+                        <span>Tarik Kawat ke Atas</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SIMULASI 2: KAPILARITAS -->
+            <div id="sim-container-capillarity" class="grid grid-cols-1 lg:grid-cols-3 gap-6 hidden">
+                <!-- 3D Viewport Column -->
+                <div class="lg:col-span-2 glass-panel rounded-3xl p-4 border border-slate-800 flex flex-col h-[540px] relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-2 px-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-sky-400 animate-ping"></span>
+                            <h3 class="text-sm font-bold text-white font-mono">3D Capillary Tubes Reservoir</h3>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="resetCapillaritySim()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Reset View
+                            </button>
+                            <button onclick="triggerAR('capillarity')" class="px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-xs text-white font-bold shadow-md hover:brightness-110">
+                                <i class="fa-solid fa-vr-cardboard mr-1"></i> Lihat dalam AR
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Three.js Canvas Container -->
+                    <div id="canvas-capillarity" class="flex-grow w-full h-full rounded-2xl bg-slate-950/80 relative cursor-grab active:cursor-grabbing overflow-hidden">
+                        <div class="absolute bottom-3 left-3 pointer-events-none text-[11px] font-mono text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-md border border-slate-800">
+                            <i class="fa-solid fa-hand-pointer mr-1"></i> Drag / Putar Model 3D | Scroll Zoom
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Control Panel -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-6">
+                    <div class="space-y-4">
+                        <h3 class="text-base font-bold text-white pb-2 border-b border-slate-800 flex items-center justify-between">
+                            <span><i class="fa-solid fa-sliders text-sky-400 mr-2"></i> Parameter Kapilaritas</span>
+                            <span class="text-xs font-mono text-sky-400">$g = 9.8\text{ m/s}^2$</span>
+                        </h3>
+
+                        <!-- Jari-jari Pipa (r) -->
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-300">Jari-jari Pipa Terpilih ($r$)</span>
+                                <span id="val-cap-r" class="font-mono text-sky-400 font-bold">0.50 mm</span>
+                            </div>
+                            <input type="range" id="input-cap-r" min="0.10" max="1.50" step="0.05" value="0.50" oninput="updateCapillaritySim()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400">
+                        </div>
+
+                        <!-- Sudut Kontak (Theta) -->
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-300">Sudut Kontak ($\theta$)</span>
+                                <span id="val-cap-theta" class="font-mono text-sky-400 font-bold">0° (Basah Sempurna)</span>
+                            </div>
+                            <input type="range" id="input-cap-theta" min="0" max="180" step="1" value="0" oninput="updateCapillaritySim()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400">
+                            <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                                <span>0° (Air-Kaca)</span>
+                                <span>90° (Netral)</span>
+                                <span>140° (Raksasa)</span>
+                            </div>
+                        </div>
+
+                        <!-- Tegangan Permukaan & Massa Jenis -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">$\gamma$ (N/m)</label>
+                                <input type="number" id="input-cap-gamma" min="0.01" max="0.5" step="0.01" value="0.072" onchange="updateCapillaritySim()" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">$\rho$ (kg/m³)</label>
+                                <input type="number" id="input-cap-rho" min="500" max="14000" step="50" value="1000" onchange="updateCapillaritySim()" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-lg p-2 font-mono">
+                            </div>
+                        </div>
+
+                        <!-- Computed Height Display -->
+                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2 font-mono text-xs">
+                            <div class="flex justify-between items-center text-slate-300">
+                                <span>Tinggi Kenaikan/Penurunan ($h$):</span>
+                                <span id="res-cap-h-mm" class="text-sky-300 font-bold text-sm">+29.39 mm</span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-300">
+                                <span>Kondisi Meniskus:</span>
+                                <span id="res-cap-status" class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">Cekung (Naik)</span>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 italic">
+                                <i class="fa-solid fa-circle-info mr-1 text-sky-400"></i>
+                                <span>h = (2·γ·cosθ) / (ρ·g·r)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Toggle Chart View Button -->
+                    <button onclick="openChartModal()" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-sm transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-chart-line text-cyan-400"></i>
+                        <span>Tampilkan Grafik $h$ vs $r$</span>
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- CHART MODAL -->
+        <div id="chart-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div class="glass-panel w-full max-w-2xl rounded-3xl p-6 border border-slate-700 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-chart-line text-cyan-400 mr-2"></i> Grafik Hubungan Tinggi Kapiler ($h$) vs Jari-jari ($r$)</h3>
+                    <button onclick="closeChartModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="w-full h-64 bg-slate-900/60 p-2 rounded-xl border border-slate-800">
+                    <canvas id="capillaryChart"></canvas>
+                </div>
+                <p class="text-xs text-slate-400 italic text-center">
+                    Semakin kecil jari-jari pipa kapiler ($r$), semakin tinggi kolom kenaikan cairan ($h$).
+                </p>
+            </div>
+        </div>
+
+
+        <!-- ================= SECTION: PENERAPAN & TANTANGAN ================= -->
+        <section id="tab-penerapan" class="tab-content hidden space-y-8 py-6">
+            <div class="text-center max-w-2xl mx-auto">
+                <h1 class="text-3xl font-extrabold text-white">Penerapan & Tantangan Kontekstual</h1>
+                <p class="text-slate-400 text-sm mt-1">Eksplorasi Fenomena Alam & Kasus Integrasi Fluida Statis</p>
+            </div>
+
+            <!-- 3 Case Simulations -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Case A -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-seedling"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">1. Xilem pada Tumbuhan</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Air diserap akar dan naik hingga puluhan meter melalui pembuluh xilem berukuran mikroskopis dengan bantuan kapilaritas, daya kohesi-adhesi, dan daya isap daun (transpirasi).
+                        </p>
+                    </div>
+                    <button onclick="runApplicationSim('xylem')" class="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs transition-all">
+                        Simulasikan Aliran Xilem
+                    </button>
+                </div>
+
+                <!-- Case B -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-scroll"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">2. Penyerapan Air Tisu</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Serat-serat selulosa kertas tisu membentuk rongga-rongga kapiler acak yang menarik cairan melawan gravitasi.
+                        </p>
+                    </div>
+                    <button onclick="runApplicationSim('tissue')" class="w-full py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition-all">
+                        Simulasikan Penyerapan Tisu
+                    </button>
+                </div>
+
+                <!-- Case C -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-fire-flame-curved"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">3. Sumbu Kompor Minyak</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Pori-pori benang pada sumbu kompor bertindak sebagai pipa kapiler yang menaikkan minyak tanah menuju ujung pembakaran.
+                        </p>
+                    </div>
+                    <button onclick="runApplicationSim('wick')" class="w-full py-2.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-bold text-xs transition-all">
+                        Simulasikan Sumbu
+                    </button>
+                </div>
+            </div>
+
+            <!-- Integrated Contextual Challenge -->
+            <div class="glass-panel p-8 rounded-3xl border border-orange-500/30 space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                        <span class="text-xs font-mono font-bold text-orange-400 uppercase tracking-widest">Tantangan Laboratorium Integrasi</span>
+                        <h2 class="text-2xl font-bold text-white mt-1">Kasus Sistem Distribusi Fluida Multikonsep</h2>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-brain"></i>
+                    </div>
+                </div>
+
+                <p class="text-sm text-slate-300 leading-relaxed">
+                    Sebuah tangki reservoir fluida terhubung dengan dongkrak hidrolik, pipa penyalur sempit, serta manometer. Analisis bagaimana kelima konsep fluida statis bekerja secara bersamaan dalam sistem ini:
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs font-mono">
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span class="text-cyan-400 font-bold block mb-1">1. P. Hidrostatis</span>
+                        Tekanan $P = \rho g h$ di dasar reservoir.
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span class="text-cyan-400 font-bold block mb-1">2. Hukum Pascal</span>
+                        Penerusan tekanan piston $F_1/A_1 = F_2/A_2$.
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span class="text-cyan-400 font-bold block mb-1">3. Archimedes</span>
+                        Gaya apung $F_A = \rho_f g V_t$ pada pelampung.
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span class="text-cyan-400 font-bold block mb-1">4. Tegangan Permukaan</span>
+                        Gaya kohesi pada batas cairan $F = \gamma L$.
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <span class="text-cyan-400 font-bold block mb-1">5. Kapilaritas</span>
+                        Kenaikan cairan di pipa ukur $h = \frac{2\gamma\cos\theta}{\rho g r}$.
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end">
+                    <button onclick="alert('Selamat! Anda telah memahami keterkaitan kelima konsep dasar fluida statis secara menyeluruh.')" class="px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-sm shadow-md hover:brightness-110">
+                        Bandingkan & Evaluasi Hasil Analisis
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= SECTION: LKPD ================= -->
+        <section id="tab-lkpd" class="tab-content hidden space-y-8 py-6">
+            <div class="text-center max-w-2xl mx-auto">
+                <h1 class="text-3xl font-extrabold text-white">Lembar Kerja Peserta Didik (LKPD)</h1>
+                <p class="text-slate-400 text-sm mt-1">Unduh & Cetak Lembar Praktikum Virtual</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- PDF 1 -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-6">
+                    <div class="space-y-4">
+                        <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">LKPD 1: Tegangan Permukaan</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Penyelidikan hubungan panjang kawat ($L$), tegangan permukaan ($\gamma$), dan gaya tarik ($F$) pada mode satu dan dua permukaan.
+                        </p>
+                    </div>
+                    <button onclick="downloadLKPD('surface')" class="w-full py-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Unduh LKPD 1 (PDF/TXT)</span>
+                    </button>
+                </div>
+
+                <!-- PDF 2 -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-6">
+                    <div class="space-y-4">
+                        <div class="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">LKPD 2: Kapilaritas</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Penyelidikan pengaruh variasi jari-jari pipa ($r$) dan sudut kontak ($\theta$) terhadap tinggi kenaikan/penurunan cairan ($h$).
+                        </p>
+                    </div>
+                    <button onclick="downloadLKPD('capillarity')" class="w-full py-3 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Unduh LKPD 2 (PDF/TXT)</span>
+                    </button>
+                </div>
+
+                <!-- PDF 3 -->
+                <div class="glass-panel rounded-3xl p-6 border border-slate-800 flex flex-col justify-between space-y-6">
+                    <div class="space-y-4">
+                        <div class="w-12 h-12 rounded-2xl bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl font-bold">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">LKPD 3: Gabungan Fluida Statis</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Lembar penyelidikan komprehensif mengintegrasikan Hidrostatis, Pascal, Archimedes, Tegangan Permukaan, dan Kapilaritas.
+                        </p>
+                    </div>
+                    <button onclick="downloadLKPD('combined')" class="w-full py-3 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Unduh LKPD Gabungan (PDF/TXT)</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= SECTION: LATIHAN SOAL ================= -->
+        <section id="tab-latihan" class="tab-content hidden space-y-8 py-6 max-w-4xl mx-auto">
+            <div class="text-center space-y-2">
+                <h1 class="text-3xl font-extrabold text-white">Kuis Evaluasi Interactive</h1>
+                <p class="text-slate-400 text-sm">10 Soal Pilihan Ganda Ber-Umpan Balik Otomatis</p>
+            </div>
+
+            <!-- Quiz Progress Header -->
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center justify-between font-mono text-xs">
+                <div class="flex items-center space-x-2">
+                    <span class="text-slate-400">Progres:</span>
+                    <span id="quiz-progress" class="text-cyan-400 font-bold">1 / 10</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-slate-400">Skor:</span>
+                    <span id="quiz-score" class="text-emerald-400 font-bold">0 Poin</span>
+                </div>
+            </div>
+
+            <!-- Quiz Card -->
+            <div id="quiz-card" class="glass-panel rounded-3xl p-6 sm:p-8 border border-slate-800 space-y-6">
+                <div class="space-y-2">
+                    <span id="quiz-category" class="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">Tegangan Permukaan</span>
+                    <h3 id="quiz-question" class="text-lg font-bold text-white leading-relaxed">
+                        <!-- Dynamic Question -->
+                    </h3>
+                </div>
+
+                <!-- Options -->
+                <div id="quiz-options" class="space-y-3">
+                    <!-- Dynamic Options -->
+                </div>
+
+                <!-- Explanation Box -->
+                <div id="quiz-explanation" class="hidden p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs leading-relaxed">
+                    <!-- Dynamic Explanation -->
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-4 border-t border-slate-800">
+                    <button id="btn-prev-quiz" onclick="navigateQuiz(-1)" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all disabled:opacity-40">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Sebelum
+                    </button>
+                    <button id="btn-next-quiz" onclick="navigateQuiz(1)" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-bold shadow-md hover:brightness-110 transition-all">
+                        Selanjutnya <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500 font-mono">
+        <div class="max-w-7xl mx-auto px-4">
+            FluidaLab 3D &copy; 2026 — WebAR Media Pembelajaran Fisika SMA/MA (Permukaan Cairan & Kapilaritas)
+        </div>
+    </footer>
+
+
+    <!-- JAVASCRIPT CODE LOGIC -->
+    <script>
+        /* ================= NAVIGATION & TAB MANAGEMENT ================= */
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-cyan-400', 'bg-slate-800/80');
+                btn.classList.add('text-slate-300');
+            });
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if(activeNav) activeNav.classList.add('text-cyan-400', 'bg-slate-800/80');
+
+            if(tabId === 'simulasi') {
+                setTimeout(() => {
+                    onWindowResizeSurface();
+                    onWindowResizeCapillarity();
+                }, 100);
+            }
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        function openSimulation(type) {
+            switchTab('simulasi');
+            switchSim(type);
+        }
+
+        function switchSim(type) {
+            const surfContainer = document.getElementById('sim-container-surface');
+            const capContainer = document.getElementById('sim-container-capillarity');
+            const btnSurf = document.getElementById('sim-btn-surface');
+            const btnCap = document.getElementById('sim-btn-capillarity');
+
+            if(type === 'surface') {
+                surfContainer.classList.remove('hidden');
+                capContainer.classList.add('hidden');
+                btnSurf.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-cyan-500 text-white shadow-md";
+                btnCap.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-400 hover:text-white";
+                onWindowResizeSurface();
+            } else {
+                surfContainer.classList.add('hidden');
+                capContainer.classList.remove('hidden');
+                btnSurf.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-400 hover:text-white";
+                btnCap.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-sky-500 text-white shadow-md";
+                onWindowResizeCapillarity();
+            }
+        }
+
+
+        /* ================= MATERI DATA & MODAL ================= */
+        const materiData = {
+            1: {
+                title: "01. Pengertian Tegangan Permukaan",
+                category: "Konsep Dasar",
+                content: `
+                    <p><b>Tegangan Permukaan ($\gamma$)</b> adalah kecenderungan permukaan zat cair untuk menegang sehingga permukaannya seperti ditutupi oleh selaput tipis yang elastis.</p>
+                    <p class="mt-2">Fenomena ini disebabkan oleh ketidakseimbangan gaya tarik antarmolekul (kohesi) pada molekul zat cair yang berada di permukaan dibanding yang di dalam volume cairan.</p>
+                    <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center font-mono my-4">
+                        $$\\gamma = \\frac{F}{L} \\quad \\text{(1 permukaan)} \\qquad \\text{atau} \\qquad \\gamma = \\frac{F}{2L} \\quad \\text{(film sabun 2 permukaan)}$$
+                    </div>
+                `
+            },
+            2: {
+                title: "02. Faktor-Faktor yang Memengaruhi Tegangan Permukaan",
+                category: "Pengaruh Lingkungan",
+                content: `
+                    <ul class="list-disc list-inside space-y-2">
+                        <li><b>Suhu Cairan:</b> Kenaikan suhu meningkatkan energi kinetik molekul sehingga gaya kohesi melemah dan tegangan permukaan menurun.</li>
+                        <li><b>Zat Aktif Permukaan (Surfaktan/Deterjen):</b> Surfaktan memutus ikatan hidrogen antarmolekul air, menurunkan tegangan permukaan secara signifikan.</li>
+                        <li><b>Jenis Zat Cair:</b> Raksa memiliki $\\gamma \\approx 0.465\\text{ N/m}$, air murni $\\gamma \\approx 0.072\\text{ N/m}$, sedangkan alkohol $\\gamma \\approx 0.022\\text{ N/m}$.</li>
+                    </ul>
+                `
+            },
+            3: {
+                title: "03. Prinsip Kapilaritas",
+                category: "Pembuluh Sempit",
+                content: `
+                    <p><b>Kapilaritas</b> adalah peristiwa naik atau turunnya permukaan zat cair di dalam pipa kapiler (pipa sempit).</p>
+                    <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center font-mono my-4">
+                        $$h = \\frac{2 \\gamma \\cos\\theta}{\\rho g r}$$
+                    </div>
+                    <ul class="list-disc list-inside space-y-1 text-xs">
+                        <li>Jika $\\theta < 90^\\circ$ (Adhesi > Kohesi): Cairan membasahi dinding & NAIK (Meniskus Cekung).</li>
+                        <li>Jika $\\theta > 90^\\circ$ (Kohesi > Adhesi): Cairan tidak membasahi & TURUN (Meniskus Cembung).</li>
+                    </ul>
+                `
+            },
+            4: {
+                title: "04. Penerapan Kapilaritas Sehari-hari",
+                category: "Penerapan",
+                content: `
+                    <p>Kapilaritas memegang peranan krusial dalam kehidupan dan biologi:</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2">
+                        <li>Naiknya air tanah menuju daun melalui pembuluh xilem tanaman.</li>
+                        <li>Penyerapan keringat oleh pakaian berbahan katun berpori.</li>
+                        <li>Meresapnya tinta pada kertas isap atau air pada kain tisu.</li>
+                    </ul>
+                `
+            },
+            5: {
+                title: "05. Masalah Kontekstual Fluida Statis",
+                category: "Integrasi",
+                content: `
+                    <p>Dalam analisis laboratorium riil, konsep fluida statis saling melengkapi:</p>
+                    <p class="mt-2 text-xs">Tekanan hidrostatis mempengaruhi dasar tabung, Hukum Pascal meneruskan tekanan mekanis, Hukum Archimedes menentukan gaya apung instrumen, sementara Tegangan Permukaan & Kapilaritas mendominasi batas permukaan serta pipa ukur mikroskopis.</p>
+                `
+            },
+            6: {
+                title: "06. Evaluasi Konsep & Perhitungan",
+                category: "Latihan",
+                content: `
+                    <p><b>Contoh Soal:</b> Sebuah pipa kapiler berjari-jari $0.5\\text{ mm}$ dicelupkan ke dalam air murni ($\\gamma = 0.072\\text{ N/m}, \\rho = 1000\\text{ kg/m}^3$). Jika sudut kontak $\\theta = 0^\\circ$, hitung tinggi kenaikan air!</p>
+                    <p class="mt-2 font-mono text-cyan-400">
+                        h = (2 · 0.072 · cos 0°) / (1000 · 9.8 · 0.0005) = 0.02939 m = 29.39 mm.
+                    </p>
+                `
+            }
+        };
+
+        function openMateriModal(id) {
+            const data = materiData[id];
+            if(!data) return;
+            document.getElementById('materi-modal-title-container').innerHTML = `
+                <span class="text-xs font-mono font-bold text-cyan-400 bg-cyan-950 px-2.5 py-1 rounded-md border border-cyan-800">${data.category}</span>
+                <h2 class="text-xl font-bold text-white mt-1">${data.title}</h2>
+            `;
+            document.getElementById('materi-modal-body').innerHTML = data.content;
+            document.getElementById('materi-modal').classList.remove('hidden');
+            if(window.MathJax) MathJax.typesetPromise();
+        }
+
+        function closeMateriModal() {
+            document.getElementById('materi-modal').classList.add('hidden');
+        }
+
+
+        /* ================= THREE.JS SIMULASI 1: TEGANGAN PERMUKAAN ================= */
+        let sceneS, cameraS, rendererS, controlsS;
+        let wireMesh, surfaceFilmMesh, arrowForceS;
+
+        function initSurfaceSim() {
+            const container = document.getElementById('canvas-surface');
+            if(!container) return;
+
+            sceneS = new THREE.Scene();
+            sceneS.background = new THREE.Color(0x0a0f1d);
+
+            cameraS = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            cameraS.position.set(0, 3, 7);
+
+            rendererS = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            rendererS.setSize(container.clientWidth, container.clientHeight);
+            rendererS.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(rendererS.domElement);
+
+            controlsS = new THREE.OrbitControls(cameraS, rendererS.domElement);
+            controlsS.enableDamping = true;
+
+            // Lights
+            sceneS.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0x00b4d8, 1);
+            dirLight.position.set(5, 10, 5);
+            sceneS.add(dirLight);
+
+            // Water Tank Container
+            const tankGeo = new THREE.BoxGeometry(4, 2, 2.5);
+            const tankMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, roughness: 0.1 });
+            const tank = new THREE.Mesh(tankGeo, tankMat);
+            tank.position.y = -0.5;
+            sceneS.add(tank);
+
+            // Water Fluid
+            const fluidGeo = new THREE.BoxGeometry(3.9, 1.8, 2.4);
+            const fluidMat = new THREE.MeshStandardMaterial({ color: 0x00b4d8, transparent: true, opacity: 0.7 });
+            const fluid = new THREE.Mesh(fluidGeo, fluidMat);
+            fluid.position.y = -0.6;
+            sceneS.add(fluid);
+
+            // Wire Frame U-Shape & Slider Wire
+            const wireMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.8 });
+            wireMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2, 16), wireMat);
+            wireMesh.rotation.z = Math.PI / 2;
+            wireMesh.position.set(0, 0.3, 0);
+            sceneS.add(wireMesh);
+
+            // Surface Film Elastic Mesh
+            const filmGeo = new THREE.PlaneGeometry(2, 0.6);
+            const filmMat = new THREE.MeshStandardMaterial({ color: 0x90e0ef, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+            surfaceFilmMesh = new THREE.Mesh(filmGeo, filmMat);
+            surfaceFilmMesh.rotation.x = Math.PI / 2;
+            surfaceFilmMesh.position.set(0, 0.1, 0);
+            sceneS.add(surfaceFilmMesh);
+
+            // Force Vector Arrow
+            arrowForceS = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0.3, 0), 1.2, 0x00ffcc);
+            sceneS.add(arrowForceS);
+
+            animateSurface();
+        }
+
+        function animateSurface() {
+            requestAnimationFrame(animateSurface);
+            if(controlsS) controlsS.update();
+            if(rendererS && sceneS && cameraS) rendererS.render(sceneS, cameraS);
+        }
+
+        function onWindowResizeSurface() {
+            const container = document.getElementById('canvas-surface');
+            if(!container || !rendererS) return;
+            cameraS.aspect = container.clientWidth / container.clientHeight;
+            cameraS.updateProjectionMatrix();
+            rendererS.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function updateSurfaceSim() {
+            const mode = document.getElementById('select-surface-mode').value;
+            const gamma = parseFloat(document.getElementById('input-gamma').value);
+            const L = parseFloat(document.getElementById('input-wire-l').value);
+
+            document.getElementById('val-gamma').innerText = `${gamma.toFixed(3)} N/m`;
+            document.getElementById('val-wire-l').innerText = `${L.toFixed(2)} m (${(L*100).toFixed(0)} cm)`;
+
+            const multiplier = mode === 'double' ? 2 : 1;
+            const F = multiplier * gamma * L;
+            const F_mN = F * 1000;
+
+            document.getElementById('res-surface-f').innerText = `${F.toFixed(5)} N`;
+            document.getElementById('res-surface-mn').innerText = `${F_mN.toFixed(2)} mN`;
+
+            if(mode === 'double') {
+                document.getElementById('res-surface-formula').innerText = `F = 2 · γ · L = 2 · ${gamma} · ${L} = ${F.toFixed(5)} N`;
+            } else {
+                document.getElementById('res-surface-formula').innerText = `F = γ · L = ${gamma} · ${L} = ${F.toFixed(5)} N`;
+            }
+
+            if(wireMesh) {
+                wireMesh.scale.set(1, L * 20, 1);
+            }
+        }
+
+        function adjustSurfaceByTemp() {
+            const temp = parseFloat(document.getElementById('input-temp').value);
+            let gamma = 0.072 - (temp - 20) * 0.00015;
+            if(gamma < 0.02) gamma = 0.02;
+            document.getElementById('input-gamma').value = gamma.toFixed(3);
+            updateSurfaceSim();
+        }
+
+        function adjustSurfaceBySurf() {
+            const surf = parseFloat(document.getElementById('input-surf').value);
+            let gamma = 0.072 - (surf * 0.0005);
+            if(gamma < 0.02) gamma = 0.02;
+            document.getElementById('input-gamma').value = gamma.toFixed(3);
+            updateSurfaceSim();
+        }
+
+        function pullWireAnim() {
+            let step = 0;
+            const interval = setInterval(() => {
+                step += 0.04;
+                if(step <= 1) {
+                    wireMesh.position.y = 0.3 + step * 0.8;
+                    surfaceFilmMesh.position.y = 0.1 + step * 0.4;
+                    arrowForceS.position.y = 0.3 + step * 0.8;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        wireMesh.position.y = 0.3;
+                        surfaceFilmMesh.position.y = 0.1;
+                        arrowForceS.position.y = 0.3;
+                    }, 800);
+                }
+            }, 30);
+        }
+
+        function resetSurfaceSim() {
+            if(controlsS) {
+                cameraS.position.set(0, 3, 7);
+                controlsS.target.set(0, 0, 0);
+            }
+        }
+
+
+        /* ================= THREE.JS SIMULASI 2: KAPILARITAS ================= */
+        let sceneC, cameraC, rendererC, controlsC;
+        let capillaryTubes = [];
+
+        function initCapillaritySim() {
+            const container = document.getElementById('canvas-capillarity');
+            if(!container) return;
+
+            sceneC = new THREE.Scene();
+            sceneC.background = new THREE.Color(0x0a0f1d);
+
+            cameraC = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            cameraC.position.set(0, 2, 7);
+
+            rendererC = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            rendererC.setSize(container.clientWidth, container.clientHeight);
+            rendererC.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(rendererC.domElement);
+
+            controlsC = new THREE.OrbitControls(cameraC, rendererC.domElement);
+            controlsC.enableDamping = true;
+
+            // Lights
+            sceneC.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0x90e0ef, 1);
+            dirLight.position.set(5, 10, 5);
+            sceneC.add(dirLight);
+
+            // Transparent Reservoir Tank
+            const resGeo = new THREE.BoxGeometry(4.5, 2, 2.5);
+            const resMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, roughness: 0.1 });
+            const reservoir = new THREE.Mesh(resGeo, resMat);
+            reservoir.position.y = -0.8;
+            sceneC.add(reservoir);
+
+            // Fluid
+            const fluidGeo = new THREE.BoxGeometry(4.4, 1.4, 2.4);
+            const fluidMat = new THREE.MeshStandardMaterial({ color: 0x00b4d8, transparent: true, opacity: 0.7 });
+            const reservoirFluid = new THREE.Mesh(fluidGeo, fluidMat);
+            reservoirFluid.position.y = -1.1;
+            sceneC.add(reservoirFluid);
+
+            // 4 Capillary Glass Tubes
+            const radii = [0.2, 0.4, 0.6, 0.8];
+            const xPositions = [-1.5, -0.5, 0.5, 1.5];
+
+            radii.forEach((r, idx) => {
+                const tubeGeo = new THREE.CylinderGeometry(r * 0.5, r * 0.5, 3.5, 32, 1, true);
+                const tubeMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, transmission: 0.9 });
+                const tube = new THREE.Mesh(tubeGeo, tubeMat);
+                tube.position.set(xPositions[idx], 0.2, 0);
+                sceneC.add(tube);
+
+                // Liquid Column Inside Tube
+                const colGeo = new THREE.CylinderGeometry(r * 0.48, r * 0.48, 1, 32);
+                const colMat = new THREE.MeshStandardMaterial({ color: 0x00b4d8, transparent: true, opacity: 0.85 });
+                const colMesh = new THREE.Mesh(colGeo, colMat);
+                colMesh.position.set(xPositions[idx], -0.2, 0);
+                sceneC.add(colMesh);
+
+                capillaryTubes.push({ mesh: colMesh, radius: r });
+            });
+
+            animateCapillarity();
+        }
+
+        function animateCapillarity() {
+            requestAnimationFrame(animateCapillarity);
+            if(controlsC) controlsC.update();
+            if(rendererC && sceneC && cameraC) rendererC.render(sceneC, cameraC);
+        }
+
+        function onWindowResizeCapillarity() {
+            const container = document.getElementById('canvas-capillarity');
+            if(!container || !rendererC) return;
+            cameraC.aspect = container.clientWidth / container.clientHeight;
+            cameraC.updateProjectionMatrix();
+            rendererC.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function updateCapillaritySim() {
+            const r_mm = parseFloat(document.getElementById('input-cap-r').value);
+            const theta_deg = parseFloat(document.getElementById('input-cap-theta').value);
+            const gamma = parseFloat(document.getElementById('input-cap-gamma').value);
+            const rho = parseFloat(document.getElementById('input-cap-rho').value);
+
+            document.getElementById('val-cap-r').innerText = `${r_mm.toFixed(2)} mm`;
+            document.getElementById('val-cap-theta').innerText = `${theta_deg}° (${theta_deg < 90 ? 'Membasahi' : 'Tidak Membasahi'})`;
+
+            const r_m = r_mm / 1000;
+            const theta_rad = (theta_deg * Math.PI) / 180;
+            const g = 9.8;
+
+            const h_m = (2 * gamma * Math.cos(theta_rad)) / (rho * g * r_m);
+            const h_mm = h_m * 1000;
+
+            document.getElementById('res-cap-h-mm').innerText = `${h_mm >= 0 ? '+' : ''}${h_mm.toFixed(2)} mm`;
+
+            const badge = document.getElementById('res-cap-status');
+            if(theta_deg < 90) {
+                badge.innerText = "Cekung (Naik)";
+                badge.className = "px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800";
+            } else if(theta_deg === 90) {
+                badge.innerText = "Datar (Tetap)";
+                badge.className = "px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700";
+            } else {
+                badge.innerText = "Cembung (Turun)";
+                badge.className = "px-2 py-0.5 rounded text-[11px] font-bold bg-rose-950 text-rose-400 border border-rose-800";
+            }
+
+            // Update 3D heights
+            capillaryTubes.forEach((tube) => {
+                const tube_r_m = (tube.radius * 0.8) / 1000;
+                const tube_h_m = (2 * gamma * Math.cos(theta_rad)) / (rho * g * tube_r_m);
+                const visualH = Math.max(0.1, Math.abs(tube_h_m * 20));
+                tube.mesh.scale.set(1, visualH, 1);
+                tube.mesh.position.y = tube_h_m >= 0 ? -0.4 + (visualH * 0.2) : -0.4 - (visualH * 0.2);
+            });
+        }
+
+        function resetCapillaritySim() {
+            if(controlsC) {
+                cameraC.position.set(0, 2, 7);
+                controlsC.target.set(0, 0, 0);
+            }
+        }
+
+
+        /* ================= WebAR LAUNCHER ================= */
+        function triggerAR(type) {
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        alert(`Memulai Sesi WebAR untuk Eksperimen ${type.toUpperCase()}. Arahkan kamera ke permukaan datar.`);
+                    } else {
+                        alert("WebXR AR tidak didukung pada browser/perangkat ini. Menampilkan simulasi 3D interaktif standar.");
+                    }
+                });
+            } else {
+                alert("Fitur WebAR memerlukan browser dengan dukungan WebXR (seperti Chrome Android). Anda tetap dapat menggunakan simulasi 3D interaktif ini.");
+            }
+        }
+
+
+        /* ================= CHART MODAL LOGIC ================= */
+        let myCapChart = null;
+
+        function openChartModal() {
+            document.getElementById('chart-modal').classList.remove('hidden');
+            const ctx = document.getElementById('capillaryChart').getContext('2d');
+
+            const gamma = parseFloat(document.getElementById('input-cap-gamma').value);
+            const rho = parseFloat(document.getElementById('input-cap-rho').value);
+            const theta_deg = parseFloat(document.getElementById('input-cap-theta').value);
+            const theta_rad = (theta_deg * Math.PI) / 180;
+            const g = 9.8;
+
+            const rValues = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5];
+            const hValues = rValues.map(r_mm => {
+                const r_m = r_mm / 1000;
+                return parseFloat(((2 * gamma * Math.cos(theta_rad)) / (rho * g * r_m) * 1000).toFixed(2));
+            });
+
+            if(myCapChart) myCapChart.destroy();
+
+            myCapChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: rValues.map(r => `${r} mm`),
+                    datasets: [{
+                        label: 'Tinggi Kenaikan h (mm)',
+                        data: hValues,
+                        borderColor: '#00B4D8',
+                        backgroundColor: 'rgba(0, 180, 216, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    },
+                    plugins: { legend: { labels: { color: '#f8fafc' } } }
+                }
+            });
+        }
+
+        function closeChartModal() {
+            document.getElementById('chart-modal').classList.add('hidden');
+        }
+
+
+        /* ================= APPLICATION SIMULATION CASES ================= */
+        function runApplicationSim(caseType) {
+            if(caseType === 'xylem') {
+                alert("Simulasi Xilem: Air naik melalui pembuluh kayu mikroskopis akibat gaya kapilaritas + kohesi molekul + tarikan transpirasi daun.");
+            } else if(caseType === 'tissue') {
+                alert("Simulasi Tisu: Pori-pori serat selulosa acak menarik molekul air dengan cepat melawan gravitasi.");
+            } else if(caseType === 'wick') {
+                alert("Simulasi Sumbu Kompor: Celah serat benang bertindak sebagai saluran kapiler untuk menyuplai minyak tanah.");
+            }
+        }
+
+
+        /* ================= LKPD DOWNLOAD SYSTEM ================= */
+        function downloadLKPD(type) {
+            let title = "";
+            let content = "";
+
+            if(type === 'surface') {
+                title = "LKPD 1 - Tegangan Permukaan";
+                content = `
+=======================================================
+LEMBAR KERJA PESERTA DIDIK (LKPD) VIRTUAL
+Eksperimen 1: Tegangan Permukaan Cairan
+=======================================================
+Nama Siswa: ____________________
+Kelas     : ____________________
+Tanggal   : ${new Date().toLocaleDateString('id-ID')}
+
+A. TUJUAN PERCOBAAN:
+Menyelidiki hubungan antara panjang kawat (L), tegangan permukaan (gamma), 
+dan gaya tarik (F) pada mode 1 permukaan dan film sabun 2 permukaan.
+
+B. TABEL DATA PENGAMATAN (Air Murni gamma = 0.072 N/m):
+-----------------------------------------------------------------------
+No | Panjang Kawat L (m) | Mode Permukaan | Gaya Hitung F (N)
+-----------------------------------------------------------------------
+1  | 0.02 m              | Single Surface | ...
+2  | 0.05 m              | Single Surface | ...
+3  | 0.05 m              | Double Film    | ...
+-----------------------------------------------------------------------
+
+C. ANALISIS & KESIMPULAN:
+1. Mengapa gaya F pada film sabun dua permukaan bernilai 2x lipat dari satu permukaan?
+2. Bagaimana pengaruh penambahan deterjen/surfaktan terhadap nilai tegangan permukaan?
+                `;
+            } else if(type === 'capillarity') {
+                title = "LKPD 2 - Kapilaritas";
+                content = `
+=======================================================
+LEMBAR KERJA PESERTA DIDIK (LKPD) VIRTUAL
+Eksperimen 2: Gejala Kapilaritas
+=======================================================
+Nama Siswa: ____________________
+Kelas     : ____________________
+Tanggal   : ${new Date().toLocaleDateString('id-ID')}
+
+A. TUJUAN PERCOBAAN:
+Menganalisis pengaruh jari-jari pipa (r) dan sudut kontak (theta) terhadap 
+tinggi kenaikan/penurunan zat cair (h).
+
+B. TABEL DATA PENGAMATAN (gamma = 0.072 N/m, rho = 1000 kg/m3):
+-----------------------------------------------------------------------
+No | Jari-jari r (mm) | Sudut Kontak theta | Tinggi h (mm) | Meniskus
+-----------------------------------------------------------------------
+1  | 0.20 mm          | 0 deg              | ...           | ...
+2  | 0.50 mm          | 0 deg              | ...           | ...
+3  | 0.50 mm          | 140 deg (Raksa)    | ...           | ...
+-----------------------------------------------------------------------
+
+C. ANALISIS & KESIMPULAN:
+1. Bagaimana hubungan antara jari-jari pipa kapiler (r) dengan tinggi kenaikan cairan (h)?
+2. Kapan zat cair mengalami penurun tinggi (h bernilai negatif) di dalam pipa kapiler?
+                `;
+            } else {
+                title = "LKPD Gabungan - Fluida Statis";
+                content = `
+=======================================================
+LEMBAR KERJA PESERTA DIDIK (LKPD) VIRTUAL INTEGRASI
+Eksperimen Gabungan Fluida Statis
+=======================================================
+Nama Siswa: ____________________
+Kelas     : ____________________
+Tanggal   : ${new Date().toLocaleDateString('id-ID')}
+
+1. Tekanan Hidrostatis: P = rho * g * h
+2. Hukum Pascal       : F1 / A1 = F2 / A2
+3. Hukum Archimedes   : FA = rho_f * g * Vt
+4. Tegangan Permukaan : F = gamma * L
+5. Kapilaritas        : h = (2 * gamma * cos theta) / (rho * g * r)
+                `;
+            }
+
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${title}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+
+        /* ================= QUIZ & EVALUATION SYSTEM ================= */
+        const quizQuestions = [
+            {
+                category: "Tegangan Permukaan",
+                question: "Tegangan permukaan pada zat cair terjadi akibat adanya ketidakseimbangan...",
+                options: [
+                    "Gaya adhesi antarmolekul cair dan wadah",
+                    "Gaya kohesi antarmolekul zat cair di permukaan",
+                    "Gaya gravitasi bumi pada zat cair",
+                    "Tekanan hidrostatis di dasar wadah"
+                ],
+                answer: 1,
+                explanation: "Tegangan permukaan disebabkan oleh gaya tarik kohesi antarmolekul sejenis di permukaan cairan yang menarik molekul ke dalam."
+            },
+            {
+                category: "Tegangan Permukaan",
+                question: "Sebuah kawat lurus sepanjang 10 cm diletakkan di permukaan air murni (γ = 0,072 N/m). Berapa gaya tegangan permukaan pada kawat (mode 1 permukaan)?",
+                options: ["0,0036 N", "0,0072 N", "0,0144 N", "0,0720 N"],
+                answer: 1,
+                explanation: "F = γ · L = 0,072 N/m · 0,10 m = 0,0072 N."
+            },
+            {
+                category: "Faktor Tegangan Permukaan",
+                question: "Pengaruh penambahan deterjen (surfaktan) ke dalam air murni adalah...",
+                options: [
+                    "Menurunkan tegangan permukaan air",
+                    "Menaikkan tegangan permukaan air",
+                    "Tidak berpengaruh pada tegangan permukaan",
+                    "Membuat sudut kontak menjadi 180°"
+                ],
+                answer: 0,
+                explanation: "Deterjen memutus ikatan hidrogen air sehingga merusak tegangan permukaan (menurunkan γ)."
+            },
+            {
+                category: "Kapilaritas",
+                question: "Jika sudut kontak (θ) antara zat cair dan dinding pipa kapiler kurang dari 90°, maka...",
+                options: [
+                    "Zat cair tidak membasahi dinding dan meniskus cembung",
+                    "Zat cair membasahi dinding dan permukaan air di pipa NAIK",
+                    "Permukaan zat cair di pipa TURUN jauh di bawah reservoir",
+                    "Gaya kohesi jauh lebih besar daripada gaya adhesi"
+                ],
+                answer: 1,
+                explanation: "θ < 90° menandakan Adhesi > Kohesi. Cairan membasahi dinding dan mengalami kenaikan kapiler (meniskus cekung)."
+            },
+            {
+                category: "Kapilaritas",
+                question: "Sebuah pipa kapiler berjari-jari 0,5 mm dicelupkan ke dalam air (γ = 0,072 N/m, ρ = 1.000 kg/m³, g = 9,8 m/s²). Jika θ = 0°, berapa tinggi h?",
+                options: ["14,7 mm", "29,4 mm", "58,8 mm", "100 mm"],
+                answer: 1,
+                explanation: "h = (2 · 0,072 · 1) / (1000 · 9,8 · 0,0005) = 0,029388 m = 29,39 mm."
+            },
+            {
+                category: "Kapilaritas",
+                question: "Apabila jari-jari pipa kapiler diperkecil menjadi setengah dari semula, maka tinggi kenaikan cairan h akan menjadi...",
+                options: ["1/2 kali semula", "Tetap", "2 kali semula", "4 kali semula"],
+                answer: 2,
+                explanation: "Karena h berbanding terbalik dengan r (h ∝ 1/r), memperkecil r menjadi setengahnya akan membuat h naik 2 kali lipat."
+            },
+            {
+                category: "Penerapan",
+                question: "Manakah fenomena berikut yang BUKAN merupakan contoh kapilaritas?",
+                options: [
+                    "Naiknya minyak tanah pada sumbu kompor",
+                    "Naiknya air dari akar menuju daun pada xilem",
+                    "Pengangkatan mobil pada dongkrak hidrolik",
+                    "Penyerapan tumpahan air oleh kertas tisu"
+                ],
+                answer: 2,
+                explanation: "Dongkrak hidrolik memanfaatkan Hukum Pascal, bukan kapilaritas."
+            },
+            {
+                category: "Integrasi Fluida",
+                question: "Mengapa raksa di dalam pipa kapiler kaca mengalami penurunan permukaan (h negatif)?",
+                options: [
+                    "Gaya adhesi raksa-kaca lebih besar dari kohesinya",
+                    "Gaya kohesi antarmolekul raksa lebih besar dari adhesinya dengan kaca (θ > 90°)",
+                    "Massa jenis raksa sangat ringan",
+                    "Raksa tidak dipengaruhi gravitasi"
+                ],
+                answer: 1,
+                explanation: "Kohesi raksa sangat kuat sehingga θ ≈ 140° (cos θ negatif), membuat meniskus cembung dan permukaan cairan turun."
+            },
+            {
+                category: "Integrasi Fluida",
+                question: "Pada film sabun dengan dua permukaan, rumus gaya tegangan permukaan total adalah...",
+                options: ["F = γ / L", "F = γ · L", "F = 2 · γ · L", "F = γ · L / 2"],
+                answer: 2,
+                explanation: "Film sabun memiliki 2 permukaan tipis (depan dan belakang), sehingga F = 2 · γ · L."
+            },
+            {
+                category: "Evaluasi",
+                question: "Suhu zat cair yang dinaikkan akan mengakibatkan tegangan permukaan zat cair tersebut...",
+                options: ["Meningkat", "Menurun", "Konstan", "Menjadi nol serta merta"],
+                answer: 1,
+                explanation: "Suhu tinggi meningkatkan gerak kinetik molekul sehingga gaya tarik kohesi melemah dan γ menurun."
+            }
+        ];
+
+        let currentQuizIndex = 0;
+        let quizAnswers = new Array(quizQuestions.length).fill(null);
+
+        function renderQuizQuestion() {
+            const q = quizQuestions[currentQuizIndex];
+            document.getElementById('quiz-progress').innerText = `${currentQuizIndex + 1} / ${quizQuestions.length}`;
+            document.getElementById('quiz-category').innerText = q.category;
+            document.getElementById('quiz-question').innerText = q.question;
+
+            const optionsContainer = document.getElementById('quiz-options');
+            optionsContainer.innerHTML = '';
+
+            q.options.forEach((opt, idx) => {
+                const isSelected = quizAnswers[currentQuizIndex] === idx;
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left p-4 rounded-2xl border transition-all text-xs sm:text-sm font-medium flex items-center justify-between ${
+                    isSelected 
+                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200' 
+                    : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+                }`;
+                btn.onclick = () => selectQuizOption(idx);
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center font-mono font-bold text-xs text-slate-400">${String.fromCharCode(65 + idx)}</span>
+                        <span>${opt}</span>
+                    </div>
+                    ${isSelected ? '<i class="fa-solid fa-circle-check text-cyan-400"></i>' : ''}
+                `;
+                optionsContainer.appendChild(btn);
+            });
+
+            // Explanation
+            const expBox = document.getElementById('quiz-explanation');
+            if(quizAnswers[currentQuizIndex] !== null) {
+                const isCorrect = quizAnswers[currentQuizIndex] === q.answer;
+                expBox.classList.remove('hidden');
+                expBox.className = `p-4 rounded-2xl border space-y-2 text-xs leading-relaxed ${
+                    isCorrect ? 'bg-emerald-950/40 border-emerald-800 text-emerald-200' : 'bg-rose-950/40 border-rose-800 text-rose-200'
+                }`;
+                expBox.innerHTML = `
+                    <div class="font-bold flex items-center space-x-2">
+                        <i class="fa-solid ${isCorrect ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-rose-400'}"></i>
+                        <span>${isCorrect ? 'Jawaban Benar!' : 'Jawaban Kurang Tepat'}</span>
+                    </div>
+                    <p class="text-slate-300">${q.explanation}</p>
+                `;
+            } else {
+                expBox.classList.add('hidden');
+            }
+
+            calculateQuizScore();
+
+            document.getElementById('btn-prev-quiz').disabled = currentQuizIndex === 0;
+            const nextBtn = document.getElementById('btn-next-quiz');
+            if(currentQuizIndex === quizQuestions.length - 1) {
+                nextBtn.innerHTML = `Selesai <i class="fa-solid fa-flag-checkered ml-1"></i>`;
+            } else {
+                nextBtn.innerHTML = `Selanjutnya <i class="fa-solid fa-arrow-right ml-1"></i>`;
+            }
+        }
+
+        function selectQuizOption(idx) {
+            quizAnswers[currentQuizIndex] = idx;
+            renderQuizQuestion();
+        }
+
+        function navigateQuiz(dir) {
+            currentQuizIndex += dir;
+            if(currentQuizIndex < 0) currentQuizIndex = 0;
+            if(currentQuizIndex >= quizQuestions.length) {
+                currentQuizIndex = quizQuestions.length - 1;
+                alert(`Kuis Selesai! Skor Akhir Anda: ${calculateQuizScore()} / 100 Poin`);
+            }
+            renderQuizQuestion();
+        }
+
+        function calculateQuizScore() {
+            let correctCount = 0;
+            quizAnswers.forEach((ans, idx) => {
+                if(ans === quizQuestions[idx].answer) correctCount++;
+            });
+            const score = correctCount * 10;
+            document.getElementById('quiz-score').innerText = `${score} Poin`;
+            return score;
+        }
+
+
+        /* ================= INITIALIZATION ON PAGE LOAD ================= */
+        window.addEventListener('load', () => {
+            initSurfaceSim();
+            initCapillaritySim();
+            updateSurfaceSim();
+            updateCapillaritySim();
+            renderQuizQuestion();
+
+            window.addEventListener('resize', () => {
+                onWindowResizeSurface();
+                onWindowResizeCapillarity();
+            });
+        });
+    </script>
+</body>
+</html>
